@@ -43,8 +43,8 @@ Alternatively, you can also build the KoP protocol handler from source code.
 1. clone this project from GitHub to your local.
 
 ```bash
-git clone https://github.com/streamnative/kop.git
-cd kop
+git clone https://github.com/Macrometacorp/c8streams-kop.git
+cd c8streams-kop
 ```
 
 2. build the project.
@@ -54,7 +54,12 @@ mvn clean install -DskipTests
 
 3. the nar file can be found at this location.
 ```bash
-./kafka-impl/target/pulsar-protocol-handler-kafka-${version}.nar
+./kafka-impl/target/kop-${version}.nar
+```
+
+4. deploy the built artifacts (nar/pom) to Maven repo
+```bash
+./kafka-impl/mvn clean deploy
 ```
 
 ### Install KoP protocol handler

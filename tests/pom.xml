@@ -20,22 +20,22 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-	<groupId>co.macrometa.c8streams.pulsar.handlers</groupId>
-    <artifactId>pulsar-protocol-handler-kafka-parent</artifactId>
+	<groupId>co.macrometa.c8streams.handlers</groupId>
+    <artifactId>kop-parent</artifactId>
     <version>2.6.2.0</version>
   </parent>
 
-  <groupId>co.macrometa.c8stream.pulsar.handlers</groupId>
-  <artifactId>pulsar-protocol-handler-kafka-tests</artifactId>
-  <name>Macrometa :: Pulsar Protocol Handler :: KoP Tests</name>
+  <groupId>co.macrometa.c8stream.handlers</groupId>
+  <artifactId>kop-tests</artifactId>
+  <name>Macrometa :: Pulsar Protocol Handler :: Kafka Tests</name>
   <description>Tests for Kafka on Pulsar</description>
 
   <!-- include the dependencies -->
   <dependencies>
     <!-- test dependencies -->
     <dependency>
-      <groupId>co.macrometa.c8streams.pulsar.handlers</groupId>
-      <artifactId>pulsar-protocol-handler-kafka</artifactId>
+      <groupId>co.macrometa.c8streams.handlers</groupId>
+      <artifactId>kop</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
@@ -63,7 +63,7 @@
             <configuration>
               <tasks>
                 <echo>copy protocol handler</echo>
-                <copy file="${basedir}/../kafka-impl/target/pulsar-protocol-handler-kafka-${project.version}.nar"
+                <copy file="${basedir}/../kafka-impl/target/kop-${project.version}.nar"
                       tofile="${basedir}/src/test/resources/test-protocol-handler.nar"/>
               </tasks>
             </configuration>

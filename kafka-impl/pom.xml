@@ -17,16 +17,19 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>co.macrometa.c8streams.pulsar.handlers</groupId>
-		<artifactId>pulsar-protocol-handler-kafka-parent</artifactId>
+		<groupId>co.macrometa.c8streams.handlers</groupId>
+		<artifactId>kop-parent</artifactId>
 		<version>2.6.2.0</version>
 	</parent>
+	
+    <packaging>nar</packaging>
 
-	<groupId>co.macrometa.c8streams.pulsar.handlers</groupId>
-	<artifactId>pulsar-protocol-handler-kafka</artifactId>
+	<groupId>co.macrometa.c8streams.handlers</groupId>
+	<artifactId>kop</artifactId>
 	<name>Macrometa :: Pulsar Protocol Handler :: Kafka</name>
 	<description>Kafka on Pulsar implemented using Pulsar Protocol Handler</description>
 
@@ -35,7 +38,6 @@
 		<!-- runtime dependencies -->
 	</dependencies>
 
-    <!--
 	<developers>
 		<developer>
 			<name>Macrometa</name>
@@ -44,10 +46,10 @@
 	</developers>
 
 	<scm>
-		<url>https://github.com/Macrometacorp/c8stream-kop.git</url>
-		<connection>scm:git:git@github.com:Macrometacorp/c8stream-kop.git</connection>
-		<developerConnection>scm:git:git@github.com:Macrometacorp/c8stream-kop.git</developerConnection>
-		<tag>pulsar-protocol-handler-kafka-2.6.2.0</tag>
+		<url>https://github.com/Macrometacorp/c8streams-kop.git</url>
+		<connection>scm:git:git@github.com:Macrometacorp/c8streams-kop.git</connection>
+		<developerConnection>scm:git:git@github.com:Macrometacorp/c8streams-kop.git</developerConnection>
+		<tag>kop-2.6.2.0</tag>
 	</scm>
 
 	<organization>
@@ -72,7 +74,7 @@
 			<url>https://oss.sonatype.org/content/groups/staging</url>
 		</repository>
 	</repositories>
-    -->
+
 	<build>
 		<plugins>
 			<plugin>
@@ -104,8 +106,8 @@
 							<goal>single</goal>
 						</goals>
 						<configuration>
-							<attach>true</attach>
-							<finalName>pulsar-kop-${project.version}</finalName>
+							<attach>false</attach>
+							<finalName>kop-${project.version}</finalName>
 							<descriptors>
 								<descriptor>src/assemble/bin.xml</descriptor>
 							</descriptors>
@@ -114,7 +116,6 @@
 				</executions>
 			</plugin>
 
-            <!--
 			<plugin>
 				<artifactId>maven-deploy-plugin</artifactId>
 				<version>2.8.2</version>
@@ -167,7 +168,7 @@
 					</execution>
 				</executions>
 			</plugin>
-			-->
+			
 		</plugins>
 	</build>
 

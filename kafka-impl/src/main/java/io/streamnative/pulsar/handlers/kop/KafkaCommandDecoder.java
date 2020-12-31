@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.kop;
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.kafka.common.protocol.ApiKeys.API_VERSIONS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Queues;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -27,6 +28,8 @@ import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.naming.AuthenticationException;
+
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.errors.LeaderNotAvailableException;
@@ -81,6 +84,15 @@ public abstract class KafkaCommandDecoder extends ChannelInboundHandlerAdapter {
         if (log.isDebugEnabled()) {
             log.debug("Channel writability has changed to: {}", ctx.channel().isWritable());
         }
+        if (ctx.channel().isWritable()) {
+            // set auto read to true if channel is writable.
+            ctx.channel().config().setAutoRead(true);
+        } else {
+            log.debug("channel is not writable, disable auto reading for back pressing");
+            ctx.channel().config().setAutoRead(false);
+            ctx.flush();
+        }
+        ctx.fireChannelWritabilityChanged();
     }
 
     // turn input ByteBuf msg, which send from client side, into KafkaHeaderAndRequest
@@ -148,12 +160,21 @@ public abstract class KafkaCommandDecoder extends ChannelInboundHandlerAdapter {
             }
 
             CompletableFuture<AbstractResponse> responseFuture = new CompletableFuture<>();
+            responseFuture.whenComplete((response, e) -> {
+                ctx.channel().eventLoop().execute(() -> {
+                    writeAndFlushResponseToClient(channel);
+                });
+            });
 
             requestsQueue.add(ResponseAndRequest.of(responseFuture, kafkaHeaderAndRequest));
 
             if (!isActive.get()) {
                 handleInactive(kafkaHeaderAndRequest, responseFuture);
             } else {
+                if (!hasAuthenticated(kafkaHeaderAndRequest)) {
+                    authenticate(kafkaHeaderAndRequest, responseFuture);
+                    return;
+                }
                 switch (kafkaHeaderAndRequest.getHeader().apiKey()) {
                     case API_VERSIONS:
                         handleApiVersionsRequest(kafkaHeaderAndRequest, responseFuture);
@@ -208,16 +229,19 @@ public abstract class KafkaCommandDecoder extends ChannelInboundHandlerAdapter {
                     case SASL_AUTHENTICATE:
                         handleSaslAuthenticate(kafkaHeaderAndRequest, responseFuture);
                         break;
+                    case CREATE_TOPICS:
+                        handleCreateTopics(kafkaHeaderAndRequest, responseFuture);
+                        break;
+                    case DESCRIBE_CONFIGS:
+                        handleDescribeConfigs(kafkaHeaderAndRequest, responseFuture);
+                        break;
                     default:
                         handleError(kafkaHeaderAndRequest, responseFuture);
                 }
             }
-
-            responseFuture.whenComplete((response, e) -> {
-                ctx.channel().eventLoop().execute(() -> {
-                    writeAndFlushResponseToClient(channel);
-                });
-            });
+        } catch (AuthenticationException e) {
+            log.error("unexpected error in authenticate:", e);
+            close();
         } catch (Exception e) {
             log.error("error while handle command:", e);
             close();
@@ -279,6 +303,12 @@ public abstract class KafkaCommandDecoder extends ChannelInboundHandlerAdapter {
         }
     }
 
+    protected abstract boolean hasAuthenticated(KafkaHeaderAndRequest kafkaHeaderAndRequest);
+
+    protected abstract void
+    authenticate(KafkaHeaderAndRequest kafkaHeaderAndRequest, CompletableFuture<AbstractResponse> response)
+            throws AuthenticationException;
+
     protected abstract void
     handleError(KafkaHeaderAndRequest kafkaHeaderAndRequest, CompletableFuture<AbstractResponse> response);
 
@@ -335,6 +365,12 @@ public abstract class KafkaCommandDecoder extends ChannelInboundHandlerAdapter {
 
     protected abstract void
     handleSaslHandshake(KafkaHeaderAndRequest kafkaHeaderAndRequest, CompletableFuture<AbstractResponse> response);
+
+    protected abstract void
+    handleCreateTopics(KafkaHeaderAndRequest kafkaHeaderAndRequest, CompletableFuture<AbstractResponse> response);
+
+    protected abstract void
+    handleDescribeConfigs(KafkaHeaderAndRequest kafkaHeaderAndRequest, CompletableFuture<AbstractResponse> response);
 
     static class KafkaHeaderAndRequest implements Closeable {
 
@@ -454,5 +490,10 @@ public abstract class KafkaCommandDecoder extends ChannelInboundHandlerAdapter {
             this.responseFuture = response;
             this.request = request;
         }
+    }
+
+    @VisibleForTesting
+    public ChannelHandlerContext getCtx() {
+        return ctx;
     }
 }

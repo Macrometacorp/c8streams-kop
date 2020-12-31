@@ -58,14 +58,11 @@ import org.apache.kafka.common.requests.FetchResponse.PartitionData;
 public final class MessageFetchContext {
 
     private KafkaRequestHandler requestHandler;
-    private KafkaHeaderAndRequest fetchRequest;
 
     // recycler and get for this object
-    public static MessageFetchContext get(KafkaRequestHandler requestHandler,
-                                          KafkaHeaderAndRequest fetchRequest) {
+    public static MessageFetchContext get(KafkaRequestHandler requestHandler) {
         MessageFetchContext context = RECYCLER.get();
         context.requestHandler = requestHandler;
-        context.fetchRequest = fetchRequest;
         return context;
     }
 
@@ -83,13 +80,14 @@ public final class MessageFetchContext {
 
     public void recycle() {
         requestHandler = null;
-        fetchRequest = null;
         recyclerHandle.recycle(this);
     }
 
 
     // handle request
-    public CompletableFuture<AbstractResponse> handleFetch(CompletableFuture<AbstractResponse> fetchResponse) {
+    public CompletableFuture<AbstractResponse> handleFetch(
+            CompletableFuture<AbstractResponse> fetchResponse,
+            KafkaHeaderAndRequest fetchRequest) {
         LinkedHashMap<TopicPartition, PartitionData<MemoryRecords>> responseData = new LinkedHashMap<>();
 
         // Map of partition and related tcm.
@@ -118,6 +116,9 @@ public final class MessageFetchContext {
                                 // all future completed now.
                                 tcm = pair.getValue().get();
                                 if (tcm == null) {
+                                    // remove null future cache from consumerTopicManagers
+                                    requestHandler.getTopicManager().getConsumerTopicManagers()
+                                            .remove(KopTopic.toString(pair.getKey()));
                                     throw new NullPointerException("topic not owned, and return null TCM in fetch.");
                                 }
                             } catch (Exception e) {
@@ -229,6 +230,9 @@ public final class MessageFetchContext {
                                         cursors.get(kafkaTopic).getLeft(),
                                         "cursor.readEntry fail. deleteCursor");
                                 } else {
+                                    // remove null future cache from consumerTopicManagers
+                                    requestHandler.getTopicManager().getConsumerTopicManagers()
+                                            .remove(KopTopic.toString(kafkaTopic));
                                     log.warn("Cursor deleted while TCM close.");
                                 }
                             });
@@ -288,6 +292,9 @@ public final class MessageFetchContext {
                                 if (cm != null) {
                                     cm.add(pair.getRight(), pair);
                                 } else {
+                                    // remove null future cache from consumerTopicManagers
+                                    requestHandler.getTopicManager().getConsumerTopicManagers()
+                                            .remove(KopTopic.toString(kafkaPartition));
                                     log.warn("Cursor deleted while TCM close, failed to add cursor back to TCM.");
                                 }
                             });

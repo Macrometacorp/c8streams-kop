@@ -26,8 +26,6 @@
  */
 package io.streamnative.pulsar.handlers.kop;
 
-import static io.streamnative.pulsar.handlers.kop.KafkaProtocolHandler.PLAINTEXT_PREFIX;
-import static io.streamnative.pulsar.handlers.kop.KafkaProtocolHandler.SSL_PREFIX;
 import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.AssertJUnit.assertTrue;
 
@@ -51,6 +49,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
+import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 
 /**
@@ -76,6 +75,18 @@ import org.testng.annotations.Test;
  */
 @Slf4j
 public class KafkaIntegrationTest extends KopProtocolHandlerTestBase {
+
+    public KafkaIntegrationTest(final String entryFormat) {
+        super(entryFormat);
+    }
+
+    @Factory
+    public static Object[] instances() {
+        return new Object[] {
+                new KafkaIntegrationTest("pulsar"),
+                new KafkaIntegrationTest("kafka")
+        };
+    }
 
     @DataProvider
     public static Object[][] integrations() {
@@ -151,11 +162,12 @@ public class KafkaIntegrationTest extends KopProtocolHandlerTestBase {
         // - set pulsar advertized address to host IP
         // - use the `host.testcontainers.internal` address exposed by testcontainers
         final String ip = getSiteLocalAddress();
-        System.out.println("exposing Pulsar broker on " + ip);
-        conf.setAdvertisedAddress(ip);
+        System.out.println("Bind Pulsar broker/KoP on " + ip);
         ((KafkaServiceConfiguration) conf).setListeners(
                 PLAINTEXT_PREFIX + ip + ":" + kafkaBrokerPort + ","
                         + SSL_PREFIX + ip + ":" + kafkaBrokerPortTls);
+        conf.setKafkaAdvertisedListeners(PLAINTEXT_PREFIX + "127.0.0.1:" + kafkaBrokerPort
+                + "," + SSL_PREFIX + "127.0.0.1:" + kafkaBrokerPortTls);
         super.internalSetup();
 
 

@@ -29,7 +29,7 @@
 
   <groupId>co.macrometa.c8streams.handlers</groupId>
   <artifactId>kop-parent</artifactId>
-  <version>2.7.0.1</version>
+  <version>2.7.0.7</version>
   <name>Macrometa :: Pulsar Protocol Handler :: Kafka Parent</name>
   <description>Parent for Kafka on Pulsar implemented using Pulsar Protocol Handler.</description>
 
@@ -385,8 +385,8 @@
   </build>
 
   <repositories>
-    <repository>
-      <id>bintray-streamnative-maven</id>
+    <repository>    
+	  <id>bintray-streamnative-maven</id>
       <name>bintray</name>
       <url>https://dl.bintray.com/streamnative/maven</url>
     </repository>

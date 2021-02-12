@@ -62,6 +62,7 @@ mvn clean install -DskipTests
 ./kafka-impl/mvn clean deploy
 ```
 
+
 ### Install KoP protocol handler
 
 As mentioned previously, the KoP protocol handler is a plugin that can be installed to the Pulsar brokers.

@@ -13,8 +13,6 @@
  */
 package io.streamnative.pulsar.handlers.kop;
 
-import static io.streamnative.pulsar.handlers.kop.KafkaProtocolHandler.PLAINTEXT_PREFIX;
-import static io.streamnative.pulsar.handlers.kop.KafkaProtocolHandler.SSL_PREFIX;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 
@@ -59,6 +57,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.errors.SerializationException;
+import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.pulsar.broker.BookKeeperClientFactory;
@@ -121,8 +120,23 @@ public abstract class KopProtocolHandlerTestBase {
     protected Server restServer;
     protected String restConnect;
 
+    private final String entryFormat;
+
+    protected static final String PLAINTEXT_PREFIX = SecurityProtocol.PLAINTEXT.name() + "://";
+    protected static final String SSL_PREFIX = SecurityProtocol.SSL.name() + "://";
+
     public KopProtocolHandlerTestBase() {
+        this.entryFormat = "pulsar";
         resetConfig();
+    }
+
+    public KopProtocolHandlerTestBase(final String entryFormat) {
+        this.entryFormat = entryFormat;
+        resetConfig();
+    }
+
+    protected EndPoint getPlainEndPoint() {
+        return new EndPoint(PLAINTEXT_PREFIX + "127.0.0.1:" + kafkaBrokerPort);
     }
 
     protected void resetConfig() {
@@ -151,9 +165,10 @@ public abstract class KopProtocolHandlerTestBase {
         // kafka related settings.
         kafkaConfig.setEnableGroupCoordinator(true);
         kafkaConfig.setOffsetsTopicNumPartitions(1);
-        kafkaConfig.setListeners(
-            PLAINTEXT_PREFIX + "localhost:" + kafkaBrokerPort + ","
-                + SSL_PREFIX + "localhost:" + kafkaBrokerPortTls);
+        kafkaConfig.setKafkaListeners(
+                PLAINTEXT_PREFIX + "localhost:" + kafkaBrokerPort + ","
+                        + SSL_PREFIX + "localhost:" + kafkaBrokerPortTls);
+        kafkaConfig.setEntryFormat(entryFormat);
 
         // set protocol related config
         URL testHandlerUrl = this.getClass().getClassLoader().getResource("test-protocol-handler.nar");

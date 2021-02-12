@@ -93,6 +93,13 @@ public class KafkaApisTest extends KopProtocolHandlerTestBase {
     KafkaRequestHandler kafkaRequestHandler;
     SocketAddress serviceAddress;
 
+    @Override
+    protected void resetConfig() {
+        super.resetConfig();
+        this.conf.setKafkaAdvertisedListeners(PLAINTEXT_PREFIX + "127.0.0.1:" + kafkaBrokerPort + ","
+                + SSL_PREFIX + "127.0.0.1:" + kafkaBrokerPortTls);
+    }
+
     @BeforeMethod
     @Override
     protected void setup() throws Exception {
@@ -137,7 +144,8 @@ public class KafkaApisTest extends KopProtocolHandlerTestBase {
             pulsar,
             (KafkaServiceConfiguration) conf,
             groupCoordinator,
-            false);
+            false,
+            getPlainEndPoint());
         ChannelHandlerContext mockCtx = mock(ChannelHandlerContext.class);
         Channel mockChannel = mock(Channel.class);
         doReturn(mockChannel).when(mockCtx).channel();
@@ -493,7 +501,7 @@ public class KafkaApisTest extends KopProtocolHandlerTestBase {
     @Test(timeOut = 20000)
     public void testBrokerRespectsPartitionsOrderAndSizeLimits() throws Exception {
         String topicName = "kopBrokerRespectsPartitionsOrderAndSizeLimits";
-        int numberTopics = 5;
+        int numberTopics = 8;
         int numberPartitions = 6;
 
         int messagesPerPartition = 9;
@@ -609,7 +617,8 @@ public class KafkaApisTest extends KopProtocolHandlerTestBase {
 
         // verify all served by same broker : localhost:port
         assertEquals(metadataResponse.brokers().size(), 1);
-        assertEquals(metadataResponse.brokers().iterator().next().host(), "localhost");
+        // NOTE: the listener's hostname is "localhost", but the advertised listener's hostname is "127.0.0.1"
+        assertEquals(metadataResponse.brokers().iterator().next().host(), "127.0.0.1");
 
         // check metadata response
         Collection<TopicMetadata> topicMetadatas = metadataResponse.topicMetadata();

@@ -62,7 +62,7 @@ mvn clean install -DskipTests
 ./kafka-impl/mvn clean deploy
 ```
 
-### Added a modified `KoP` protocol handler having a new version on `C8Streams`
+### Install a modified `KoP` protocol handler having a new version on `C8Streams`
 
 1. Open the file `c8streams/distribution/server/pom.xml` in `C8Streams` repository
 2. Setup the correct version of `KoP` in `maven-dependency-plugin` 

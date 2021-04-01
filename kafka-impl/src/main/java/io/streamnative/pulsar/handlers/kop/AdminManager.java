@@ -54,7 +54,8 @@ class AdminManager {
         this.admin = admin;
     }
 
-    CompletableFuture<Map<String, ApiError>> createTopicsAsync(Map<String, TopicDetails> createInfo, int timeoutMs) {
+    CompletableFuture<Map<String, ApiError>> createTopicsAsync(Map<String, TopicDetails> createInfo, int timeoutMs,
+    		boolean isDefaultTopicTypePartitioned) {
         final Map<String, CompletableFuture<ApiError>> futureMap = new ConcurrentHashMap<>();
         final AtomicInteger numTopics = new AtomicInteger(createInfo.size());
         final CompletableFuture<Map<String, ApiError>> resultFuture = new CompletableFuture<>();
@@ -85,7 +86,11 @@ class AdminManager {
                 errorFuture.complete(ApiError.fromThrowable(e));
                 return;
             }
-            admin.topics().createPartitionedTopicAsync(kopTopic.getFullName(), detail.numPartitions)
+            
+            CompletableFuture<Void> topicAsync = isDefaultTopicTypePartitioned ?
+            		admin.topics().createPartitionedTopicAsync(kopTopic.getFullName(), detail.numPartitions) :
+            			admin.topics().createNonPartitionedTopicAsync(kopTopic.getFullName());
+            topicAsync
                     .whenComplete((ignored, e) -> {
                         if (e == null) {
                             if (log.isDebugEnabled()) {

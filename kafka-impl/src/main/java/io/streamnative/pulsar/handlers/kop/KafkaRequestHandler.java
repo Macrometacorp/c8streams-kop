@@ -37,6 +37,7 @@ import io.streamnative.pulsar.handlers.kop.utils.OffsetFinder;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -117,6 +118,7 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.loadbalance.LoadManager;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
@@ -415,34 +417,46 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
                                     pulsarTopics.put(topic, pulsarTopicNames);
                                 } else {
                                     if (kafkaConfig.isAllowAutoTopicCreation()
-                                            && metadataRequest.allowAutoTopicCreation()) {
+                                            && metadataRequest.allowAutoTopicCreation()
+                                            && kafkaConfig.isDefaultTopicTypePartitioned()) {
                                         if (log.isDebugEnabled()) {
                                             log.debug("[{}] Request {}: Topic {} has single partition, "
                                                     + "auto create partitioned topic",
                                                 ctx.channel(), metadataHar.getHeader(), topic);
                                         }
-                                        admin.topics().createPartitionedTopicAsync(kopTopic.getFullName(),
-                                                defaultNumPartitions);
-                                        pulsarTopicNames = IntStream
-                                            .range(0, defaultNumPartitions)
-                                            .mapToObj(i -> TopicName.get(kopTopic.getPartitionName(i)))
-                                            .collect(Collectors.toList());
-                                        pulsarTopics.put(topic, pulsarTopicNames);
 
+										admin.topics().createPartitionedTopicAsync(kopTopic.getFullName(),
+														defaultNumPartitions);
+										pulsarTopicNames = IntStream.range(0, defaultNumPartitions)
+														.mapToObj(i -> TopicName.get(kopTopic.getPartitionName(i)))
+														.collect(Collectors.toList());
+										pulsarTopics.put(topic, pulsarTopicNames);
                                     } else {
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("[{}] Request {}: Topic {} is non-partitioned, "
+                                                    + "auto create non-partitioned topic",
+                                                ctx.channel(), metadataHar.getHeader(), topic);
+                                        }
+                                    	admin.topics().createNonPartitionedTopicAsync(kopTopic.getFullName());
+                                    	pulsarTopics.put(topic, Arrays.asList(TopicName.get(kopTopic.getFullName())));
+                                    	
                                         // NOTE: Currently no matter topic is a non-partitioned topic or topic doesn't
                                         // exist, the queried partitions from broker are both 0.
                                         // See https://github.com/apache/pulsar/issues/8813 for details.
+                                    	/*
                                         log.error("[{}] Request {}: Topic {} doesn't exist and it's not allowed to"
                                                         + "auto create partitioned topic",
                                                 ctx.channel(), metadataHar.getHeader(), topic);
+                                        */
                                         // not allow to auto create topic, return unknown topic
+                                    	/*
                                         allTopicMetadata.add(
                                             new TopicMetadata(
                                                 Errors.UNKNOWN_TOPIC_OR_PARTITION,
                                                 topic,
                                                 false,
                                                 Collections.emptyList()));
+                                        */
                                     }
                                 }
                             }
@@ -663,17 +677,18 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
 
     protected void handleOffsetFetchRequest(KafkaHeaderAndRequest offsetFetch,
                                             CompletableFuture<AbstractResponse> resultFuture) {
+        
         checkArgument(offsetFetch.getRequest() instanceof OffsetFetchRequest);
         OffsetFetchRequest request = (OffsetFetchRequest) offsetFetch.getRequest();
         checkState(groupCoordinator != null,
-            "Group Coordinator not started");
-
+            "Group Coordinator not started");      
+        
         KeyValue<Errors, Map<TopicPartition, OffsetFetchResponse.PartitionData>> keyValue =
             groupCoordinator.handleFetchOffsets(
                 request.groupId(),
                 Optional.ofNullable(request.partitions())
-            );
-
+            );      
+        
         resultFuture.complete(new OffsetFetchResponse(keyValue.getKey(), keyValue.getValue()));
     }
 
@@ -890,6 +905,7 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
     // get offset from underline managedLedger
     protected void handleListOffsetRequest(KafkaHeaderAndRequest listOffset,
                                            CompletableFuture<AbstractResponse> resultFuture) {
+        
         checkArgument(listOffset.getRequest() instanceof ListOffsetRequest);
         // the only difference between v0 and v1 is the `max_num_offsets => INT32`
         // v0 is required because it is used by librdkafka
@@ -898,6 +914,7 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
         } else {
             handleListOffsetRequestV1AndAbove(listOffset, resultFuture);
         }
+        
     }
 
     // For non exist topics handleOffsetCommitRequest return UNKNOWN_TOPIC_OR_PARTITION
@@ -967,6 +984,7 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
 
     protected void handleJoinGroupRequest(KafkaHeaderAndRequest joinGroup,
                                           CompletableFuture<AbstractResponse> resultFuture) {
+        
         checkArgument(joinGroup.getRequest() instanceof JoinGroupRequest);
         checkState(groupCoordinator != null,
             "Group Coordinator not started");
@@ -1006,12 +1024,13 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
                     response, joinGroup.getHeader().correlationId(), joinGroup.getHeader().clientId());
             }
 
-            resultFuture.complete(response);
+            resultFuture.complete(response);           
         });
     }
 
     protected void handleSyncGroupRequest(KafkaHeaderAndRequest syncGroup,
                                           CompletableFuture<AbstractResponse> resultFuture) {
+        
         checkArgument(syncGroup.getRequest() instanceof SyncGroupRequest);
         SyncGroupRequest request = (SyncGroupRequest) syncGroup.getRequest();
 
@@ -1030,6 +1049,7 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
 
             resultFuture.complete(response);
         });
+        
     }
 
     protected void handleHeartbeatRequest(KafkaHeaderAndRequest heartbeat,
@@ -1182,7 +1202,8 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
             resultFuture.complete(new CreateTopicsResponse(result));
         } else {
             // TODO: handle request.validateOnly()
-            adminManager.createTopicsAsync(validTopics, request.timeout()).thenApply(validResult -> {
+            adminManager.createTopicsAsync(validTopics, request.timeout(), kafkaConfig.isDefaultTopicTypePartitioned())
+            .thenApply(validResult -> {
                 result.putAll(validResult);
                 resultFuture.complete(new CreateTopicsResponse(result));
                 return null;
@@ -1235,7 +1256,7 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
         }
 
         if (log.isDebugEnabled()) {
-            log.debug("Found broker for topic {} puslarAddress: {}",
+            log.debug("Found broker for topic {} pulsarAddress: {}",
                 topic, pulsarAddress);
         }
 

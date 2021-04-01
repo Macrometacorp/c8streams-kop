@@ -218,7 +218,9 @@ public class KafkaProtocolHandler implements ProtocolHandler {
             kafkaConfig.setBindAddress(conf.getBindAddress());
         }
         this.bindAddress = ServiceConfigurationUtils.getDefaultOrConfiguredAddress(kafkaConfig.getBindAddress());
-        KopTopic.initialize(kafkaConfig.getKafkaTenant() + "/" + kafkaConfig.getKafkaNamespace());
+        //KopTopic.initialize(kafkaConfig.getKafkaTenant() + "/" + kafkaConfig.getKafkaNamespace());
+        KopTopic.initialize(kafkaConfig.getKafkaTenant() + "/" + kafkaConfig.getKafkaNamespace(),
+        		kafkaConfig.isDefaultTopicTypePartitioned());
     }
 
     // This method is called after initialize

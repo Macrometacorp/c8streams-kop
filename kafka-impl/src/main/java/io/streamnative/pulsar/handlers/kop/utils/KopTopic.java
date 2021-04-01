@@ -28,6 +28,7 @@ public class KopTopic {
 
     private static final String persistentDomain = "persistent://";
     private static volatile String namespacePrefix;  // the full namespace prefix, e.g. "public/default"
+    private static boolean isDefaultTopicTypePartitioned;
 
     public static String removeDefaultNamespacePrefix(String fullTopicName) {
         final String topicPrefix = persistentDomain + namespacePrefix + "/";
@@ -45,6 +46,15 @@ public class KopTopic {
         KopTopic.namespacePrefix = namespace;
     }
 
+    public static void initialize(String namespace, boolean isDefaultTopicTypePartitioned) {
+        if (namespace.split("/").length != 2) {
+            throw new IllegalArgumentException("Invalid namespace: " + namespace);
+        }
+        KopTopic.namespacePrefix = namespace;
+        KopTopic.isDefaultTopicTypePartitioned = isDefaultTopicTypePartitioned;
+    }
+    
+    
     @Getter
     private final String originalName;
     @Getter
@@ -82,10 +92,12 @@ public class KopTopic {
         if (partition < 0) {
             throw new IllegalArgumentException("Invalid partition " + partition + ", it should be non-negative number");
         }
-        return fullName + PARTITIONED_TOPIC_SUFFIX + partition;
+        return isDefaultTopicTypePartitioned ? fullName + PARTITIONED_TOPIC_SUFFIX + partition: fullName;
     }
 
     public static String toString(TopicPartition topicPartition) {
-        return (new KopTopic(topicPartition.topic())).getPartitionName(topicPartition.partition());
+    	KopTopic kopTopic = new KopTopic(topicPartition.topic());
+        return isDefaultTopicTypePartitioned ? kopTopic.getPartitionName(topicPartition.partition()) : 
+        	kopTopic.getFullName();
     }
 }

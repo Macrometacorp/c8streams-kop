@@ -63,7 +63,7 @@ public class KopTopicTest {
 
     @Test
     public void testGetPartitionName() {
-        KopTopic.initialize("my-tenant/my-ns");
+        KopTopic.initialize("my-tenant/my-ns", true);
         KopTopic topic = new KopTopic("my-topic");
         assertEquals(topic.getPartitionName(0), "persistent://my-tenant/my-ns/my-topic-partition-0");
         assertEquals(topic.getPartitionName(12), "persistent://my-tenant/my-ns/my-topic-partition-12");

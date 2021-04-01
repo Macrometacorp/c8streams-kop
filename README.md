@@ -62,8 +62,12 @@ mvn clean install -DskipTests
 ./kafka-impl/mvn clean deploy
 ```
 
+### Added a modified `KoP` protocol handler having a new version on `C8Streams`
 
-### Install KoP protocol handler
+1. Open the file `c8streams/distribution/server/pom.xml` in `C8Streams` repository
+2. Setup the correct version of `KoP` in `maven-dependency-plugin` 
+
+### Install KoP protocol handler locally
 
 As mentioned previously, the KoP protocol handler is a plugin that can be installed to the Pulsar brokers.
 

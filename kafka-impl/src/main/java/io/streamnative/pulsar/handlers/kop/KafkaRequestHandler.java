@@ -17,22 +17,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.kafka.common.protocol.CommonFields.THROTTLE_TIME_MS;
-import static org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails;
-
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import io.netty.channel.ChannelHandlerContext;
-import io.streamnative.pulsar.handlers.kop.coordinator.group.GroupCoordinator;
-import io.streamnative.pulsar.handlers.kop.coordinator.group.GroupMetadata.GroupOverview;
-import io.streamnative.pulsar.handlers.kop.coordinator.group.GroupMetadata.GroupSummary;
-import io.streamnative.pulsar.handlers.kop.format.EntryFormatter;
-import io.streamnative.pulsar.handlers.kop.format.EntryFormatterFactory;
-import io.streamnative.pulsar.handlers.kop.offset.OffsetAndMetadata;
-import io.streamnative.pulsar.handlers.kop.security.SaslAuthenticator;
-import io.streamnative.pulsar.handlers.kop.utils.CoreUtils;
-import io.streamnative.pulsar.handlers.kop.utils.KopTopic;
-import io.streamnative.pulsar.handlers.kop.utils.MessageIdUtils;
-import io.streamnative.pulsar.handlers.kop.utils.OffsetFinder;
 
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -51,10 +35,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
 import javax.naming.AuthenticationException;
 
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
@@ -75,6 +58,7 @@ import org.apache.kafka.common.requests.AbstractResponse;
 import org.apache.kafka.common.requests.ApiError;
 import org.apache.kafka.common.requests.ApiVersionsResponse;
 import org.apache.kafka.common.requests.CreateTopicsRequest;
+import org.apache.kafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.apache.kafka.common.requests.CreateTopicsResponse;
 import org.apache.kafka.common.requests.DeleteGroupsRequest;
 import org.apache.kafka.common.requests.DeleteGroupsResponse;
@@ -118,7 +102,6 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.loadbalance.LoadManager;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.admin.PulsarAdmin;
-import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.partition.PartitionedTopicMetadata;
@@ -128,6 +111,25 @@ import org.apache.pulsar.common.util.Murmur3_32Hash;
 import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
 import org.apache.pulsar.zookeeper.ZooKeeperCache;
 import org.apache.pulsar.zookeeper.ZooKeeperCache.Deserializer;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
+import io.netty.channel.ChannelHandlerContext;
+import io.streamnative.pulsar.handlers.kop.coordinator.group.GroupCoordinator;
+import io.streamnative.pulsar.handlers.kop.coordinator.group.GroupMetadata.GroupOverview;
+import io.streamnative.pulsar.handlers.kop.coordinator.group.GroupMetadata.GroupSummary;
+import io.streamnative.pulsar.handlers.kop.format.EntryFormatter;
+import io.streamnative.pulsar.handlers.kop.format.EntryFormatterFactory;
+import io.streamnative.pulsar.handlers.kop.offset.OffsetAndMetadata;
+import io.streamnative.pulsar.handlers.kop.security.SaslAuthenticator;
+import io.streamnative.pulsar.handlers.kop.utils.CoreUtils;
+import io.streamnative.pulsar.handlers.kop.utils.KopTopic;
+import io.streamnative.pulsar.handlers.kop.utils.MessageIdUtils;
+import io.streamnative.pulsar.handlers.kop.utils.OffsetFinder;
+import io.streamnative.pulsar.handlers.kop.utils.ZooKeeperUtils;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * This class contains all the request handling methods.
@@ -199,7 +201,9 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         log.info("channel inactive {}", ctx.channel());
-
+        
+        ZooKeeperUtils.deleteNode(pulsarService.getZkClient(), remoteAddress.toString());
+        
         close();
         isActive.set(false);
     }
@@ -224,7 +228,8 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
                                 CompletableFuture<AbstractResponse> responseFuture) throws AuthenticationException {
         if (authenticator != null) {
             authenticator.authenticate(
-                    kafkaHeaderAndRequest.getHeader(), kafkaHeaderAndRequest.getRequest(), responseFuture);
+                    kafkaHeaderAndRequest.getHeader(), kafkaHeaderAndRequest.getRequest(), 
+                    kafkaHeaderAndRequest.getRemoteAddress().toString(), responseFuture);
         }
     }
 
@@ -357,6 +362,12 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
                 ctx.channel(), metadataHar.getHeader(), metadataRequest.topics());
         }
 
+    	String namespace = ZooKeeperUtils.getData(pulsarService.getZkClient(), remoteAddress.toString());
+        if (log.isDebugEnabled()) {
+            log.debug("Namespace {}", namespace);
+        }
+    	KopTopic.initialize(namespace);
+        
         // Command response for all topics
         List<TopicMetadata> allTopicMetadata = Collections.synchronizedList(Lists.newArrayList());
         List<Node> allNodes = Collections.synchronizedList(Lists.newArrayList());
@@ -386,6 +397,7 @@ public class KafkaRequestHandler extends KafkaCommandDecoder {
 
             requestTopics.stream()
                 .forEach(topic -> {
+
                     KopTopic kopTopic = new KopTopic(topic);
 
                     // get partition numbers for each topic.

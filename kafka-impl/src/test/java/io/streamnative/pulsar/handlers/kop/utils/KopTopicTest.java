@@ -40,6 +40,7 @@ public class KopTopicTest {
         assertEquals(topic.getOriginalName(), "my-topic");
         assertEquals(topic.getFullName(), "persistent://my-tenant/my-ns/my-topic");
 
+        /*
         topic = new KopTopic("my-tenant-2/my-ns-2/my-topic");
         assertEquals(topic.getOriginalName(), "my-tenant-2/my-ns-2/my-topic");
         assertEquals(topic.getFullName(), "persistent://my-tenant-2/my-ns-2/my-topic");
@@ -47,12 +48,12 @@ public class KopTopicTest {
         topic = new KopTopic("persistent://my-tenant-3/my-ns-3/my-topic");
         assertEquals(topic.getOriginalName(), "persistent://my-tenant-3/my-ns-3/my-topic");
         assertEquals(topic.getFullName(), topic.getOriginalName());
-
+        */
         try {
             topic = new KopTopic("my-ns/my-topic");
             fail();
         } catch (IllegalArgumentException e) {
-            assertTrue(e.getMessage().contains("Invalid short topic name"));
+            assertTrue(e.getMessage().contains("Invalid topic name"));
         }
         try {
             topic = new KopTopic("persistent://my-topic");

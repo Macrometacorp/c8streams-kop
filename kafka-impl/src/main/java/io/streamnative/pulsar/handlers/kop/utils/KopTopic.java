@@ -27,6 +27,8 @@ import org.apache.kafka.common.TopicPartition;
 public class KopTopic {
 
     private static final String persistentDomain = "persistent://";
+    private static final String topicKafka = "public/__kafka/__consumer_offsets";
+    
     private static volatile String namespacePrefix;  // the full namespace prefix, e.g. "public/default"
     private static boolean isDefaultTopicTypePartitioned;
 
@@ -70,21 +72,18 @@ public class KopTopic {
 
     private String expandToFullName(String topic) {
         if (topic.startsWith(persistentDomain)) {
-            if (topic.substring(persistentDomain.length()).split("/").length != 3) {
-                throw new IllegalArgumentException("Invalid topic name '" + topic + "', it should be "
-                        + " persistent://<tenant>/<namespace>/<topic>");
-            }
-            return topic;
+        	throw new IllegalArgumentException("Invalid topic name '" + topic + 
+        			"', it must not begin with 'persistent:'");
         }
 
         String[] parts = topic.split("/");
-        if (parts.length == 3) {
+        if (parts.length == 3 && topic.contains(topicKafka)) {
             return persistentDomain + topic;
         } else if (parts.length == 1) {
             return persistentDomain + namespacePrefix + "/" + topic;
         } else {
-            throw new IllegalArgumentException("Invalid short topic name '" + topic + "', it should be in the format"
-                    + " of <tenant>/<namespace>/<topic> or <topic>");
+            throw new IllegalArgumentException("Invalid topic name '" + topic + 
+            		"', it should be simple string <topic>");
         }
     }
 

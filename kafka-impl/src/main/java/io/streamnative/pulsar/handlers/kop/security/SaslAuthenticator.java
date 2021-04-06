@@ -15,17 +15,13 @@ package io.streamnative.pulsar.handlers.kop.security;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import io.streamnative.pulsar.handlers.kop.SaslAuth;
-import io.streamnative.pulsar.handlers.kop.utils.SaslUtils;
-
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import javax.naming.AuthenticationException;
 
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
+import javax.naming.AuthenticationException;
 
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
@@ -50,6 +46,12 @@ import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.api.AuthData;
 import org.apache.pulsar.common.policies.data.AuthAction;
 
+import io.streamnative.pulsar.handlers.kop.SaslAuth;
+import io.streamnative.pulsar.handlers.kop.utils.SaslUtils;
+import io.streamnative.pulsar.handlers.kop.utils.ZooKeeperUtils;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * The SASL authenticator.
  */
@@ -68,7 +70,9 @@ public class SaslAuthenticator {
      */
     public static class IllegalStateException extends AuthenticationException {
 
-        public IllegalStateException(String msg, State actualState, State expectedState) {
+		private static final long serialVersionUID = -4778246381017671674L;
+
+		public IllegalStateException(String msg, State actualState, State expectedState) {
             super(msg + " actual state: " + actualState + " expected state: " + expectedState);
         }
     }
@@ -78,13 +82,16 @@ public class SaslAuthenticator {
      */
     public static class UnsupportedSaslMechanismException extends AuthenticationException {
 
-        public UnsupportedSaslMechanismException(String mechanism) {
+		private static final long serialVersionUID = -7008534791615192037L;
+
+		public UnsupportedSaslMechanismException(String mechanism) {
             super("SASL mechanism '" + mechanism + "' requested by client is not supported");
         }
     }
 
     private final AuthenticationService authenticationService;
     private final PulsarAdmin admin;
+    private final PulsarService pulsarService;
     private final Set<String> allowedMechanisms;
     private State state = State.HANDSHAKE_OR_VERSIONS_REQUEST;
     @Getter
@@ -96,12 +103,14 @@ public class SaslAuthenticator {
 
     public SaslAuthenticator(PulsarService pulsarService, Set<String> allowedMechanisms) throws PulsarServerException {
         this.authenticationService = pulsarService.getBrokerService().getAuthenticationService();
+        this.pulsarService = pulsarService;
         this.admin = pulsarService.getAdminClient();
         this.allowedMechanisms = allowedMechanisms;
     }
 
     public void authenticate(RequestHeader header,
                              AbstractRequest request,
+                             String remoteAddress,
                              CompletableFuture<AbstractResponse> response) throws AuthenticationException {
         switch (state) {
             case HANDSHAKE_OR_VERSIONS_REQUEST:
@@ -109,7 +118,7 @@ public class SaslAuthenticator {
                 handleKafkaRequest(header, request, response);
                 break;
             case AUTHENTICATE:
-                handleAuthenticate(header, request, response);
+                handleAuthenticate(header, request, remoteAddress, response);
                 break;
             default:
                 break;
@@ -158,6 +167,7 @@ public class SaslAuthenticator {
 
     private void handleAuthenticate(RequestHeader header,
                                     AbstractRequest request,
+                                    String remoteAddress,
                                     CompletableFuture<AbstractResponse> responseFuture) throws AuthenticationException {
         ApiKeys apiKey = header.apiKey();
         short version = header.apiVersion();
@@ -205,6 +215,12 @@ public class SaslAuthenticator {
         try {
             Map<String, Set<AuthAction>> permissions = admin.namespaces().getPermissions(namespace);
             if (permissions.containsKey(authRole)) {
+            	byte[] namespaceBytes = namespace.getBytes(Charset.forName("UTF-8"));
+                if (log.isDebugEnabled()) {
+                    log.debug("namespace {}", namespace);
+                }
+            	ZooKeeperUtils.createPath(pulsarService.getZkClient(), remoteAddress, namespaceBytes);
+            	
                 responseFuture.complete(new SaslAuthenticateResponse(Errors.NONE, ""));
                 setState(State.COMPLETE);
             } else {
